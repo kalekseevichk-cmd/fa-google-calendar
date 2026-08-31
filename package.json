@@ -1,0 +1,17 @@
+{
+  "name": "fa-google-calendar",
+  "version": "1.0.0",
+  "description": "Financial University schedule sync with Google Calendar",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "auth": "node src/auth.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "googleapis": "^144.0.0",
+    "node-cron": "^3.0.3"
+  }
+}

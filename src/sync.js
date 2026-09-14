@@ -2,6 +2,7 @@ const fs = require("fs");
 const path = require("path");
 
 const { getCalendar } = require("./googleCalendar");
+const { isMailConfigured, getHomeworkBySubject } = require("./mail");
 
 const TIMEZONE = process.env.TIMEZONE || "Europe/Moscow";
 
@@ -1166,6 +1167,114 @@ async function syncSchedule(lessons) {
 
 
     // --------------------------------------------------------
+    // HOMEWORK FROM MAIL
+    // --------------------------------------------------------
+
+    let homeworkFromMail = 0;
+
+    if (isMailConfigured()) {
+        console.log("");
+        console.log(
+            "📬 Проверяем почту на наличие домашних заданий..."
+        );
+
+        const activeSubjects =
+            lessons
+                .filter(lesson => !isPastLesson(lesson))
+                .map(lesson => lesson.subject);
+
+        const homeworkBySubject =
+            await getHomeworkBySubject(activeSubjects);
+
+        for (
+            const [subject, homeworkText]
+            of Object.entries(homeworkBySubject)
+        ) {
+            const nextLesson =
+                lessons
+                    .filter(lesson =>
+                        lesson.subject === subject &&
+                        !isPastLesson(lesson)
+                    )
+                    .sort(
+                        (a, b) =>
+                            getLessonTimestamp(a) -
+                            getLessonTimestamp(b)
+                    )[0];
+
+            if (!nextLesson) {
+                continue;
+            }
+
+            const key = getEventKey(nextLesson);
+            const saved = newEvents[key];
+
+            if (!saved || !saved.googleEventId) {
+                continue;
+            }
+
+            try {
+                const googleEvent =
+                    await getGoogleEvent(
+                        calendar,
+                        saved.googleEventId
+                    );
+
+                if (!googleEvent) {
+                    continue;
+                }
+
+                const existingHomework =
+                    extractHomework(
+                        googleEvent.description
+                    );
+
+                if (
+                    existingHomework &&
+                    existingHomework.includes(homeworkText)
+                ) {
+                    continue;
+                }
+
+                const mergedHomework =
+                    existingHomework
+                        ? `${existingHomework}\n${homeworkText}`
+                        : homeworkText;
+
+                await updateGoogleEvent(
+                    calendar,
+                    saved.googleEventId,
+                    buildGoogleEvent(
+                        nextLesson,
+                        mergedHomework
+                    )
+                );
+
+                newEvents[key] = {
+                    ...saved,
+
+                    lastSync:
+                        new Date().toISOString()
+                };
+
+                homeworkFromMail++;
+
+                console.log(
+                    `📬 ДЗ из почты добавлено: ${subject}`
+                );
+            } catch (error) {
+                errors++;
+
+                console.error(
+                    `❌ Ошибка добавления ДЗ из почты для "${subject}":`,
+                    error.message
+                );
+            }
+        }
+    }
+
+
+    // --------------------------------------------------------
     // MISSING FUTURE LESSONS
     // --------------------------------------------------------
 
@@ -1357,6 +1466,10 @@ async function syncSchedule(lessons) {
 
     console.log(
         `📝 ДЗ перенесено: ${homeworkTransferred}`
+    );
+
+    console.log(
+        `📬 ДЗ из почты: ${homeworkFromMail}`
     );
 
     console.log(

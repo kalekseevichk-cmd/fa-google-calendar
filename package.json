@@ -12,6 +12,8 @@
     "axios": "^1.7.0",
     "dotenv": "^16.4.0",
     "googleapis": "^144.0.0",
+    "imap-simple": "^5.1.0",
+    "mailparser": "^3.9.26",
     "node-cron": "^3.0.3"
   }
 }
